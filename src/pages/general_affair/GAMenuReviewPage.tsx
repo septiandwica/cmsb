@@ -119,7 +119,7 @@ export default function GAMenuReviewPage() {
 
   // pagination (server-side)
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
@@ -138,58 +138,68 @@ export default function GAMenuReviewPage() {
 
   // ====================== FETCH MENUS (SERVER PAGINATION) =======================
 
-  const fetchMenus = async () => {
-    try {
-      setLoading(true);
+const fetchMenus = async () => {
+  try {
+    setLoading(true);
 
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(limit),
-      });
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
 
-      if (gaLocationId) {
-        params.append("location_id", String(gaLocationId));
-      }
+    if (gaLocationId) params.append("location_id", String(gaLocationId));
 
-      if (vendorFilter !== "all") params.append("vendor_id", vendorFilter);
-      if (shiftFilter !== "all") params.append("shift_id", shiftFilter);
-      if (typeFilter !== "all") params.append("type", typeFilter);
-      if (statusFilter !== "all") params.append("status", statusFilter);
-      if (search.trim()) params.append("search", search.trim());
-      if (dateFrom) params.append("start_date", dateFrom);
-      if (dateTo) params.append("end_date", dateTo);
+    if (vendorFilter !== "all") params.append("vendor_id", vendorFilter);
+    if (shiftFilter !== "all") params.append("shift_id", shiftFilter);
+    if (typeFilter !== "all") params.append("type", typeFilter);
+    if (statusFilter !== "all") params.append("status", statusFilter);
+    if (search.trim()) params.append("search", search.trim());
+    if (dateFrom) params.append("start_date", dateFrom);
+    if (dateTo) params.append("end_date", dateTo);
 
-      const res = await fetch(`${API_BASE}/api/menus?${params.toString()}`, {
-        headers: authHeaders,
-      });
+    const res = await fetch(`${API_BASE}/api/menus?${params.toString()}`, {
+      headers: authHeaders,
+    });
 
-      const result = await res.json();
-      if (!res.ok) {
-        throw new Error(result.message || "Failed loading menus");
-      }
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.message || "Failed loading menus");
 
-      const list: Menu[] = Array.isArray(result.data) ? result.data : [];
+    const list: Menu[] = Array.isArray(result.data) ? result.data : [];
 
-      // optional: kalau masih mau filter berdasarkan location vendor
-      const filteredByLoc = list.filter((m) => {
-        if (!gaLocationId) return true;
-        const menuLocationId =
-          (m as any).location_id ?? m.vendor?.location_id ?? null;
-        return menuLocationId === gaLocationId;
-      });
+    // ===========================================
+    // GA FILTER → ONLY SHOW NON-DRAFT MENUS
+    // ===========================================
+    const allowedStatuses = [
+      "submitted",
+      "revision_required",
+      "approved",
+      "auto_approved",
+    ];
 
-      setMenus(filteredByLoc);
+    const listFilteredForGA = list.filter((m) =>
+      allowedStatuses.includes(m.status)
+    );
 
-      const pagination = result.pagination || {};
-      setTotalPages(pagination.totalPages || 1);
-      setTotalItems(pagination.total || filteredByLoc.length);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed loading menus");
-    } finally {
-      setLoading(false);
-    }
-  };
+    // location-based (if needed)
+    const filteredByLoc = listFilteredForGA.filter((m) => {
+      if (!gaLocationId) return true;
+      const menuLoc = (m as any).location_id ?? m.vendor?.location_id ?? null;
+      return menuLoc === gaLocationId;
+    });
+
+    setMenus(filteredByLoc);
+
+    const pagination = result.pagination || {};
+    setTotalPages(pagination.totalPages || 1);
+    setTotalItems(pagination.total || filteredByLoc.length);
+  } catch (err) {
+    console.error(err);
+    toast.error("Failed loading menus");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const fetchVendors = async () => {
     try {

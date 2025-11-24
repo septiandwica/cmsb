@@ -56,11 +56,11 @@ export default function AdminDepartmentOrderManagement() {
   const [shifts, setShifts] = useState<any[]>([]);
 
   const [page, setPage] = useState(1);
-const [limit, setLimit] = useState(10);
-const [totalItems, setTotalItems] = useState(0);
-const [totalPages, setTotalPages] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   // ============================================================
   // Normalize helper
   // ============================================================
@@ -85,29 +85,29 @@ const [loadingOrders, setLoadingOrders] = useState(false);
   // ============================================================
   // FETCH ORDERS
   // ============================================================
-const fetchOrders = async () => {
-  try {
-    setLoadingOrders(true);
+  const fetchOrders = async () => {
+    try {
+      setLoadingOrders(true);
 
-    const params: any = { page, limit };
+      const params: any = { page, limit };
 
-    if (dateFrom) params.start_date = dateFrom;
-    if (dateTo) params.end_date = dateTo;
-    if (shiftFilter !== "all") params.shift_id = shiftFilter;
-    if (typeFilter !== "all") params.type = typeFilter;
-    if (statusFilter !== "all") params.status = statusFilter;
+      if (dateFrom) params.start_date = dateFrom;
+      if (dateTo) params.end_date = dateTo;
+      if (shiftFilter !== "all") params.shift_id = shiftFilter;
+      if (typeFilter !== "all") params.type = typeFilter;
+      if (statusFilter !== "all") params.status = statusFilter;
 
-    const res = await axios.get("/orders/list", { params });
+      const res = await axios.get("/orders/list", { params });
 
-    setOrders(normalize(res.data.data));
-    setTotalItems(res.data.pagination.total);
-    setTotalPages(res.data.pagination.total_pages);
-  } catch {
-    toast.error("Failed to fetch orders");
-  } finally {
-    setLoadingOrders(false);
-  }
-};
+      setOrders(normalize(res.data.data));
+      setTotalItems(res.data.pagination.total);
+      setTotalPages(res.data.pagination.total_pages);
+    } catch {
+      toast.error("Failed to fetch orders");
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
 
   // ============================================================
   // GET SUMMARY (NO NOTIF)
@@ -151,8 +151,6 @@ const fetchOrders = async () => {
     getPendingSummary(); // auto load summary
   }, []);
 
-
-  
   // ============================================================
   // CLIENT-SIDE SEARCH
   // ============================================================
@@ -180,81 +178,78 @@ const fetchOrders = async () => {
   };
 
   const handleChangePage = (newPage: number) => {
-  if (newPage < 1 || newPage > totalPages) return;
-  setPage(newPage);
-  fetchOrders();
-};
+    if (newPage < 1 || newPage > totalPages) return;
+    setPage(newPage);
+    fetchOrders();
+  };
 
-// CHANGE ROWS PER PAGE
-const handleChangeRowsPerPage = (value: string) => {
-  const newLimit = Number(value);
-  setLimit(newLimit);
-  setPage(1);
-  fetchOrders();
-};
+  // CHANGE ROWS PER PAGE
+  const handleChangeRowsPerPage = (value: string) => {
+    const newLimit = Number(value);
+    setLimit(newLimit);
+    setPage(1);
+    fetchOrders();
+  };
 
   const groupedOrders = useMemo(() => {
-  const tree: Record<
-    string,
-    Record<string, Record<string, any[]>>
-  > = {};
+    const tree: Record<string, Record<string, Record<string, any[]>>> = {};
 
-  filteredOrders.forEach((o: any) => {
-    const date = o.date || "-";
-    const shift = o.shift || "-";
-    const employee = o.user || "-";
+    filteredOrders.forEach((o: any) => {
+      const date = o.date || "-";
+      const shift = o.shift || "-";
+      const employee = o.user || "-";
 
-    if (!tree[date]) tree[date] = {};
-    if (!tree[date][shift]) tree[date][shift] = {};
-    if (!tree[date][shift][employee]) tree[date][shift][employee] = [];
+      if (!tree[date]) tree[date] = {};
+      if (!tree[date][shift]) tree[date][shift] = {};
+      if (!tree[date][shift][employee]) tree[date][shift][employee] = [];
 
-    tree[date][shift][employee].push(o);
-  });
+      tree[date][shift][employee].push(o);
+    });
 
-  return tree;
-}, [filteredOrders]);
+    return tree;
+  }, [filteredOrders]);
 
-const departmentStats = useMemo(() => {
-  // struktur: { [department]: { totalOrders, totalOT, employees: Set } }
-  const map: Record<
-    string,
-    {
-      totalOrders: number;
-      totalOT: number;
-      employees: Set<string>;
-    }
-  > = {};
+  const departmentStats = useMemo(() => {
+    // struktur: { [department]: { totalOrders, totalOT, employees: Set } }
+    const map: Record<
+      string,
+      {
+        totalOrders: number;
+        totalOT: number;
+        employees: Set<string>;
+      }
+    > = {};
 
-  filteredOrders.forEach((o: any) => {
-    const dept = o.department || "Unknown Dept";
-    const empName = o.user || "-";
-    const type = o.type || "";
+    filteredOrders.forEach((o: any) => {
+      const dept = o.department || "Unknown Dept";
+      const empName = o.user || "-";
+      const type = o.type || "";
 
-    if (!map[dept]) {
-      map[dept] = {
-        totalOrders: 0,
-        totalOT: 0,
-        employees: new Set<string>(),
-      };
-    }
+      if (!map[dept]) {
+        map[dept] = {
+          totalOrders: 0,
+          totalOT: 0,
+          employees: new Set<string>(),
+        };
+      }
 
-    map[dept].totalOrders += 1;
-    if (type === "ot") {
-      map[dept].totalOT += 1;
-    }
-    if (empName !== "-") {
-      map[dept].employees.add(empName);
-    }
-  });
+      map[dept].totalOrders += 1;
+      if (type === "ot") {
+        map[dept].totalOT += 1;
+      }
+      if (empName !== "-") {
+        map[dept].employees.add(empName);
+      }
+    });
 
-  // convert ke array biar gampang di-render
-  return Object.entries(map).map(([department, v]) => ({
-    department,
-    totalOrders: v.totalOrders,
-    totalOT: v.totalOT,
-    totalEmployees: v.employees.size,
-  }));
-}, [filteredOrders]);
+    // convert ke array biar gampang di-render
+    return Object.entries(map).map(([department, v]) => ({
+      department,
+      totalOrders: v.totalOrders,
+      totalOT: v.totalOT,
+      totalEmployees: v.employees.size,
+    }));
+  }, [filteredOrders]);
 
   // ============================================================
   // RENDER UI
@@ -286,7 +281,6 @@ const departmentStats = useMemo(() => {
           </div>
         </div>
 
-
         {/* SEARCH */}
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
@@ -298,42 +292,41 @@ const departmentStats = useMemo(() => {
           />
         </div>
         {/* STATS PER DEPARTMENT */}
-{departmentStats.length > 0 && (
-  <Card className="p-4 bg-white border shadow-sm">
-    <h2 className="text-sm font-semibold mb-3 text-gray-700">
-      Department Order Stats (filtered)
-    </h2>
+        {departmentStats.length > 0 && (
+          <Card className="p-4 bg-white border shadow-sm">
+            <h2 className="text-sm font-semibold mb-3 text-gray-700">
+              Department Order Stats (filtered)
+            </h2>
 
-    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      {departmentStats.map((s) => (
-        <div
-          key={s.department}
-          className="border rounded-lg p-3 bg-gray-50 flex flex-col gap-1"
-        >
-          <p className="text-xs font-semibold text-gray-700 truncate">
-            {s.department}
-          </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {departmentStats.map((s) => (
+                <div
+                  key={s.department}
+                  className="border rounded-lg p-3 bg-gray-50 flex flex-col gap-1"
+                >
+                  <p className="text-xs font-semibold text-gray-700 truncate">
+                    {s.department}
+                  </p>
 
-          <p className="text-xs text-gray-500">Total Orders</p>
-          <p className="text-lg font-bold text-gray-900">
-            {s.totalOrders}
-          </p>
+                  <p className="text-xs text-gray-500">Total Orders</p>
+                  <p className="text-lg font-bold text-gray-900">
+                    {s.totalOrders}
+                  </p>
 
-          <div className="flex justify-between text-xs mt-1">
-            <span className="text-gray-500">OT Employees</span>
-            <span className="font-semibold">{s.totalOT}</span>
-          </div>
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className="text-gray-500">OT Employees</span>
+                    <span className="font-semibold">{s.totalOT}</span>
+                  </div>
 
-          <div className="flex justify-between text-xs">
-            <span className="text-gray-500">Unique Employees</span>
-            <span className="font-semibold">{s.totalEmployees}</span>
-          </div>
-        </div>
-      ))}
-    </div>
-  </Card>
-)}
-
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Unique Employees</span>
+                    <span className="font-semibold">{s.totalEmployees}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {/* FILTER BAR */}
         <Card className="p-4 space-y-3">
@@ -426,160 +419,189 @@ const departmentStats = useMemo(() => {
 
         {/* ORDERS TABLE */}
         {/* TABLE WRAPPER */}
-<div className="bg-white rounded-lg border shadow-sm overflow-x-auto">
-  <Table className="min-w-[1100px]">
-    <TableHeader>
-      <TableRow className="bg-gray-100">
-        <TableHead className="w-[200px] font-bold">Department</TableHead>
-        <TableHead className="w-[140px] font-bold">Date</TableHead>
-        <TableHead className="w-[110px] font-bold">Shift</TableHead>
-        <TableHead className="w-[180px] font-bold">Employee</TableHead>
-        <TableHead className="w-[220px] font-bold">Menu</TableHead>
-        <TableHead className="w-[120px] font-bold">Type</TableHead>
-        <TableHead className="w-[140px] font-bold">Status</TableHead>
-        <TableHead className="w-[110px] font-bold">Absent</TableHead>
-      </TableRow>
-    </TableHeader>
+        <div className="bg-white rounded-lg border shadow-sm overflow-x-auto">
+          <Table className="min-w-[1100px]">
+            <TableHeader>
+              <TableRow className="bg-gray-100">
+                <TableHead className="w-[200px] font-bold">
+                  Department
+                </TableHead>
+                <TableHead className="w-[140px] font-bold">Date</TableHead>
+                <TableHead className="w-[110px] font-bold">Shift</TableHead>
+                <TableHead className="w-[180px] font-bold">Employee</TableHead>
+                <TableHead className="w-[220px] font-bold">Menu</TableHead>
+                <TableHead className="w-[120px] font-bold">Type</TableHead>
+                <TableHead className="w-[140px] font-bold">Status</TableHead>
+                <TableHead className="w-[110px] font-bold">Absent</TableHead>
+              </TableRow>
+            </TableHeader>
 
-    <TableBody>
-      {/* LOADING */}
-      {loadingOrders && orders.length === 0 && (
-        <TableRow>
-          <TableCell colSpan={8} className="py-6 text-center text-gray-500">
-            Loading orders...
-          </TableCell>
-        </TableRow>
-      )}
-
-      {/* EMPTY */}
-      {!loadingOrders && Object.keys(groupedOrders).length === 0 && (
-        <TableRow>
-          <TableCell colSpan={8} className="py-6 text-center text-gray-500">
-            No orders found.
-          </TableCell>
-        </TableRow>
-      )}
-
-     {/* GROUPED RENDERING */}
-{!loadingOrders &&
-  Object.entries(groupedOrders).map(([date, shiftGroup]) => {
-    const dateRowCount = Object.values(shiftGroup).flatMap((empGroup: any) =>
-      Object.values(empGroup).flat()
-    ).length;
-
-    let datePrinted = false;
-
-    return Object.entries(shiftGroup).map(([shift, employeeGroup]) => {
-      const shiftRowCount = Object.values(employeeGroup).flat().length;
-      let shiftPrinted = false;
-
-      return Object.entries(employeeGroup).map(([employee, rows]) => {
-        const empRowCount = rows.length;
-        let employeePrinted = false;
-
-        return rows.map((o: any) => (
-          <TableRow key={o.id} className="align-top hover:bg-gray-50">
-
-            {/* DATE */}
-            {!datePrinted && (
-              <TableCell rowSpan={dateRowCount} className="font-medium">
-                {date}
-              </TableCell>
-            )}
-            {(datePrinted = true)}
-
-            {/* SHIFT */}
-            {!shiftPrinted && (
-              <TableCell rowSpan={shiftRowCount}>{shift}</TableCell>
-            )}
-            {(shiftPrinted = true)}
-
-            {/* EMPLOYEE */}
-            {!employeePrinted && (
-              <TableCell rowSpan={empRowCount}>{employee}</TableCell>
-            )}
-            {(employeePrinted = true)}
-
-            {/* MENU */}
-            <TableCell>{o.menu_name || "-"}</TableCell>
-
-            {/* TYPE */}
-            <TableCell>
-              <Badge variant="outline">
-                {(o.type || "").toUpperCase()}
-              </Badge>
-            </TableCell>
-
-            {/* STATUS */}
-            <TableCell>{renderStatus(o.status)}</TableCell>
-
-            {/* ABSENT */}
-            <TableCell>
-              {o.absent ? (
-                <Badge className="bg-gray-200 text-gray-800">Yes</Badge>
-              ) : (
-                <span className="text-xs text-gray-500">-</span>
+            <TableBody>
+              {/* LOADING */}
+              {loadingOrders && orders.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="py-6 text-center text-gray-500"
+                  >
+                    Loading orders...
+                  </TableCell>
+                </TableRow>
               )}
-            </TableCell>
-          </TableRow>
-        ));
-      });
-    });
-  })}
 
-    </TableBody>
-  </Table>
+              {/* EMPTY */}
+              {!loadingOrders && Object.keys(groupedOrders).length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="py-6 text-center text-gray-500"
+                  >
+                    No orders found.
+                  </TableCell>
+                </TableRow>
+              )}
 
-  {/* PAGINATION */}
-  <div className="p-4 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-    <p className="text-sm text-gray-600">
-      Showing <b>{filteredOrders.length}</b> of <b>{totalItems}</b> orders
-    </p>
+              {/* GROUPED RENDERING */}
+              {!loadingOrders &&
+                Object.entries(groupedOrders).map(([date, shiftGroup]) => {
+                  const dateRowCount = Object.values(shiftGroup).flatMap(
+                    (empGroup: any) => Object.values(empGroup).flat()
+                  ).length;
 
-    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-      <Select value={String(limit)} onValueChange={handleChangeRowsPerPage}>
-        <SelectTrigger className="w-[150px]">
-          <SelectValue placeholder="Rows per page" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="5">5 / page</SelectItem>
-          <SelectItem value="10">10 / page</SelectItem>
-          <SelectItem value="20">20 / page</SelectItem>
-          <SelectItem value="50">50 / page</SelectItem>
-        </SelectContent>
-      </Select>
+                  let datePrinted = false;
 
-      <Pagination>
-        <PaginationContent>
-          <PaginationItem>
-            <PaginationPrevious
-              aria-label="Previous page"
-              onClick={() => handleChangePage(page - 1)}
-            />
-          </PaginationItem>
+                  return Object.entries(shiftGroup).map(
+                    ([shift, employeeGroup]) => {
+                      const shiftRowCount =
+                        Object.values(employeeGroup).flat().length;
+                      let shiftPrinted = false;
 
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <PaginationItem key={i}>
-              <PaginationLink
-                isActive={page === i + 1}
-                onClick={() => handleChangePage(i + 1)}
+                      return Object.entries(employeeGroup).map(
+                        ([employee, rows]) => {
+                          const empRowCount = rows.length;
+                          let employeePrinted = false;
+
+                          return rows.map((o: any) => (
+                            <TableRow
+                              key={o.id}
+                              className="align-top hover:bg-gray-50"
+                            >
+                              {/* DATE */}
+                              {!datePrinted && (
+                                <TableCell
+                                  rowSpan={dateRowCount}
+                                  className="font-medium"
+                                >
+                                  {date}
+                                </TableCell>
+                              )}
+                              {(datePrinted = true)}
+
+                              {/* SHIFT */}
+                              {!shiftPrinted && (
+                                <TableCell rowSpan={shiftRowCount}>
+                                  {shift}
+                                </TableCell>
+                              )}
+                              {(shiftPrinted = true)}
+
+                              {/* EMPLOYEE */}
+                              {!employeePrinted && (
+                                <TableCell rowSpan={empRowCount}>
+                                  {employee}
+                                </TableCell>
+                              )}
+                              {(employeePrinted = true)}
+
+                              {/* MENU */}
+                              <TableCell>{o.menu_name || "-"}</TableCell>
+
+                              {/* TYPE */}
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {(o.type || "").toUpperCase()}
+                                </Badge>
+                              </TableCell>
+
+                              {/* STATUS */}
+                              <TableCell>{renderStatus(o.status)}</TableCell>
+
+                              {/* ABSENT */}
+                              <TableCell>
+                                {o.absent ? (
+                                  <Badge className="bg-gray-200 text-gray-800">
+                                    Yes
+                                  </Badge>
+                                ) : (
+                                  <span className="text-xs text-gray-500">
+                                    -
+                                  </span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ));
+                        }
+                      );
+                    }
+                  );
+                })}
+            </TableBody>
+          </Table>
+
+          {/* PAGINATION */}
+          <div className="p-4 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+            <p className="text-sm text-gray-600">
+              Showing <b>{filteredOrders.length}</b> of <b>{totalItems}</b>{" "}
+              orders
+            </p>
+
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+              <Select
+                value={String(limit)}
+                onValueChange={handleChangeRowsPerPage}
               >
-                {i + 1}
-              </PaginationLink>
-            </PaginationItem>
-          ))}
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Rows per page" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 / page</SelectItem>
+                  <SelectItem value="10">10 / page</SelectItem>
+                  <SelectItem value="20">20 / page</SelectItem>
+                  <SelectItem value="50">50 / page</SelectItem>
+                </SelectContent>
+              </Select>
 
-          <PaginationItem>
-            <PaginationNext
-              aria-label="Next page"
-              onClick={() => handleChangePage(page + 1)}
-            />
-          </PaginationItem>
-        </PaginationContent>
-      </Pagination>
-    </div>
-  </div>
-</div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      aria-label="Previous page"
+                      onClick={() => handleChangePage(page - 1)}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: totalPages }).map((_, i) => (
+                    <PaginationItem key={i}>
+                      <PaginationLink
+                        isActive={page === i + 1}
+                        onClick={() => handleChangePage(i + 1)}
+                      >
+                        {i + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      aria-label="Next page"
+                      onClick={() => handleChangePage(page + 1)}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </div>
+        </div>
 
         {/* SUMMARY */}
         <Card className="p-4">

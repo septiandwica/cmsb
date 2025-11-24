@@ -31,6 +31,7 @@ import SpareOrderForm from "./pages/admin_department/order/SpareOrder";
 import GASpareOrderForm from "./pages/general_affair/order/SpareOrder";
 import EmployeeOrderHistory from "./pages/employee/order/MyOrder";
 import VendorRedeemScanner from "./pages/vendor_catering/redeem/Scanner";
+import RedeemManagement from "./pages/vendor_catering/redeem/RedeemManagement";
 
 export default function App() {
   const initAuth = useAuthStore((s) => s.initAuth);
@@ -134,6 +135,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <VendorRedeemScanner />
+            </ProtectedRoute>
+          }
+        />
+         <Route
+          path="/vendor/redeems"
+          element={
+            <ProtectedRoute>
+              <RedeemManagement />
             </ProtectedRoute>
           }
         />

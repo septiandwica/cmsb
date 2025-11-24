@@ -1,3 +1,7 @@
+// ==========================
+//  VendorRedeemScanner.tsx
+//  FINAL LAYOUT VERSION
+// ==========================
 import { useEffect, useRef, useState } from "react";
 import axios from "@/api/axiosInstance";
 import moment from "moment";
@@ -21,6 +25,9 @@ import {
 
 import { toast } from "sonner";
 
+// ===========================
+// TYPES
+// ===========================
 interface PreviewResponse {
   user_name: string;
   department_id: number | null;
@@ -29,7 +36,6 @@ interface PreviewResponse {
   shift_name: string;
   shift_time: string;
   already_redeemed: boolean;
-  // 🟢 tambahan: waktu sudah pernah redeem (kalau ada)
   redeemed_at?: string | null;
 }
 
@@ -55,7 +61,7 @@ interface StockItem {
 }
 
 // ===========================
-// 🧼 QR SANITIZER
+// QR SANITIZER
 // ===========================
 function sanitizeQr(raw: string) {
   try {
@@ -81,42 +87,36 @@ export default function VendorRedeemScanner() {
 
   const lastScan = useRef<string>("");
   const isStarting = useRef(false);
+  const lastErrorTime = useRef<number>(0);
+
+const [todayLogs, setTodayLogs] = useState<any[]>([]);
+
 
   // ============================
-  // 📊 FETCH TODAY STOCK
+  // FETCH STOCK
   // ============================
   const fetchTodayStock = async () => {
     try {
       const res = await axios.get("/redeem/today-stock");
       setTodayStock(res.data.data || []);
-    } catch (err: any) {
-      console.error("Fetch stock failed:", err);
-      // jangan spam toast kalau gagal terus, cukup log
-    }
+    } catch {}
   };
 
   // ============================
-  // 🎥 START CAMERA — SAFE VERSION
+  // START CAMERA — STABLE VERSION
   // ============================
   const startScanner = async () => {
     try {
       if (!scannerRef.current) return;
 
-      // Prevent multiple starts
-      if (isStarting.current) {
-        console.log("⛔ Start blocked — camera busy");
-        return;
-      }
+      if (isStarting.current) return;
       isStarting.current = true;
 
-      // Already scanning → skip
       if (html5Qr.current?.getState() === Html5QrcodeScannerState.SCANNING) {
-        console.log("⛔ Already scanning");
         isStarting.current = false;
         return;
       }
 
-      // Init instance jika pertama kali
       if (!html5Qr.current) {
         html5Qr.current = new Html5Qrcode("qr-reader");
       }
@@ -137,14 +137,16 @@ export default function VendorRedeemScanner() {
 
       await html5Qr.current.start(
         backCam.id,
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        { fps: 15, qrbox: { width: 250, height: 250 } },
         (decoded) => handleScan(decoded),
-        () => {}
+        () => {
+          const now = Date.now();
+          if (now - lastErrorTime.current > 1500) {
+            lastErrorTime.current = now;
+          }
+        }
       );
-
-      console.log("📸 Scanner started");
-    } catch (error) {
-      console.error("Camera start error:", error);
+    } catch {
       toast.error("Failed to start camera");
     } finally {
       isStarting.current = false;
@@ -152,38 +154,32 @@ export default function VendorRedeemScanner() {
   };
 
   // ============================
-  // 🛑 STOP CAMERA — SAFE VERSION
+  // STOP CAMERA
   // ============================
   const stopScanner = async () => {
     try {
-      if (html5Qr.current?.isScanning) {
-        await html5Qr.current.stop();
-        console.log("🛑 Scanner stopped");
-      }
-    } catch (error: any) {
-      console.warn("Stop scanner error:", error?.message);
-    }
+      if (html5Qr.current?.isScanning) await html5Qr.current.stop();
+    } catch {}
   };
 
   // ============================
-  // 📡 HANDLE QR SCAN
+  // HANDLE QR SCAN
   // ============================
   const handleScan = (raw: string) => {
     const cleaned = sanitizeQr(raw);
+    if (cleaned === lastScan.current) return;
 
-    if (cleaned === lastScan.current) return; // Avoid spam
     lastScan.current = cleaned;
-
     setQrInput(cleaned);
 
     setHighlight(true);
-    setTimeout(() => setHighlight(false), 500);
+    setTimeout(() => setHighlight(false), 300);
 
     handlePreview(cleaned);
   };
 
   // ============================
-  // 🔍 PREVIEW API
+  // PREVIEW
   // ============================
   const handlePreview = async (value: string) => {
     try {
@@ -209,11 +205,12 @@ export default function VendorRedeemScanner() {
   };
 
   // ============================
-  // ✅ REDEEM API
+  // REDEEM
   // ============================
   const handleRedeem = async () => {
     if (!qrInput) return toast.error("QR empty");
     if (!preview) return toast.error("Preview first");
+
     if (preview.already_redeemed) return toast.error("Already redeemed");
 
     try {
@@ -225,46 +222,78 @@ export default function VendorRedeemScanner() {
 
       setRedeemResult(res.data.data);
 
-      // update preview (flag sudah redeemed)
       setPreview({
         ...preview,
         already_redeemed: true,
         redeemed_at: res.data.data.redeemed_at,
       });
 
-      // 🔁 refresh stok setelah redeem
       fetchTodayStock();
-
       toast.success("Redeem success");
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Redeem failed");
     }
   };
 
-  const handleReset = () => {
-    lastScan.current = "";
-    setQrInput("");
-    setPreview(null);
-    setRedeemResult(null);
-    setHighlight(false);
-  };
+  const handleReset = () =>
+    (() => {
+      lastScan.current = "";
+      setQrInput("");
+      setPreview(null);
+      setRedeemResult(null);
+      setHighlight(false);
+    })();
 
   // ============================
-  // 🎬 INIT CAMERA + STOCK ON MOUNT
+  // INIT CAMERA + STOCK
   // ============================
   useEffect(() => {
     startScanner();
     fetchTodayStock();
 
-    // auto refresh stok tiap 5 detik
-    const interval = setInterval(fetchTodayStock, 5000);
+    const interval = setInterval(fetchTodayStock, 4000);
 
     return () => {
       stopScanner();
       clearInterval(interval);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ============================
+  // AUTO CONFIRM AFTER 2 SECONDS
+  // ============================
+  useEffect(() => {
+    if (!preview) return;
+    if (preview.already_redeemed) return;
+
+    // ⏳ kalau ada QR baru, restart countdown
+    const timer = setTimeout(() => {
+      handleRedeem();
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [preview]);
+
+
+  /* ============================
+    LAST REDEEM — REALTIME MERGED LOGS
+============================ */
+
+const fetchTodayLogs = async () => {
+  try {
+    const res = await axios.get("/redeem/today-redeem-logs");
+    setTodayLogs(res.data.data || []);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+// Auto refresh logs
+useEffect(() => {
+  fetchTodayLogs();
+  const interval = setInterval(fetchTodayLogs, 4000);
+  return () => clearInterval(interval);
+}, []);
 
   // ============================
   // UI
@@ -276,7 +305,7 @@ export default function VendorRedeemScanner() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Vendor — Redeem Scanner</h1>
-            <p className="text-gray-600 text-sm">Scan QR untuk redeem meal.</p>
+            <p className="text-gray-600 text-sm">Scan QR to redeem meals.</p>
           </div>
 
           <div className="flex gap-2">
@@ -297,287 +326,218 @@ export default function VendorRedeemScanner() {
             </Button>
           </div>
         </div>
-  {/* TODAY STOCK PANEL */}
-            <Card className="p-5">
-              <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Utensils className="w-5 h-5" />
-                Today’s Menu Stock
-              </h2>
 
-              {todayStock.length === 0 ? (
-                <p className="text-sm text-gray-500">No stock data...</p>
-              ) : (
-                <div className="space-y-3">
-                  {todayStock.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="border rounded-lg p-3 bg-white shadow-sm"
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-semibold">{item.menu_name}</p>
-                          <p className="text-xs text-gray-500">
-                            Tray: {item.tray_name}
-                          </p>
-                        </div>
-
-                        <Badge
-                          className={
-                            item.remaining <= 0
-                              ? "bg-red-100 text-red-700"
-                              : "bg-green-100 text-green-700"
-                          }
-                        >
-                          {item.remaining} left
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-4 text-xs mt-2 text-center">
-                        <div>
-                          <p className="font-bold">{item.planned_qty}</p>
-                          <p className="text-gray-500 text-[11px]">Planned</p>
-                        </div>
-
-                        <div>
-                          <p className="font-bold">
-                            {item.auto_random_qty}
-                          </p>
-                          <p className="text-gray-500 text-[11px]">
-                            Random
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="font-bold">{item.spare_qty}</p>
-                          <p className="text-gray-500 text-[11px]">Spare</p>
-                        </div>
-
-                        <div>
-                          <p className="font-bold">
-                            {item.redeemed_qty}
-                          </p>
-                          <p className="text-gray-500 text-[11px]">
-                            Redeemed
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-        {/* CAMERA SECTION */}
-        <Card className="p-5 space-y-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <QrCode className="w-5 h-5" /> QR Scanner
+        {/* ============================
+            TODAY STOCK (FULL WIDTH)
+        ============================ */}
+        <Card className="p-5">
+          <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Utensils className="w-5 h-5" />
+            Today's Menu Stock
           </h2>
 
-          {!cameraAvailable ? (
-            <p className="text-red-500 text-sm">No camera available</p>
+          {todayStock.length === 0 ? (
+            <p className="text-sm text-gray-500">No stock data...</p>
           ) : (
-            <div
-              className={`rounded-lg overflow-hidden border ${
-                highlight ? "border-green-500 shadow-lg" : "border-gray-300"
-              }`}
-            >
-              <div id="qr-reader" ref={scannerRef} />
-            </div>
-          )}
+            <div className="space-y-3">
+              {todayStock.map((item) => (
+                <div
+                  key={item.menu_id}
+                  className="border rounded-lg p-3 bg-white shadow-sm"
+                >
+                  <div className="flex justify-between">
+                    <div>
+                      <p className="font-semibold">{item.menu_name}</p>
+                      <p className="text-xs text-gray-500">
+                        Tray: {item.tray_name}
+                      </p>
+                    </div>
 
-          {/* Manual Input */}
-          <div className="space-y-2">
-            <p className="text-xs text-gray-500">Manual Input</p>
-            <div className="flex gap-2">
-              <Input
-                value={qrInput}
-                onChange={(e) => setQrInput(e.target.value)}
-                placeholder="Enter QR code..."
-              />
-              <Button onClick={() => handlePreview(sanitizeQr(qrInput))}>
-                Preview
-              </Button>
-            </div>
-          </div>
+                    <Badge
+                      className={
+                        item.remaining <= 0
+                          ? "bg-red-100 text-red-700"
+                          : "bg-green-100 text-green-700"
+                      }
+                    >
+                      {item.remaining} left
+                    </Badge>
+                  </div>
 
-          {/* PREVIEW STATUS BUBBLE */}
-          {preview && (
-            <div
-              className={`p-3 rounded-lg ${
-                preview.already_redeemed
-                  ? "bg-red-100 border border-red-300"
-                  : "bg-green-100 border border-green-300"
-              }`}
-            >
-              <div className="flex gap-2 items-center">
-                {preview.already_redeemed ? (
-                  <XCircle className="w-5 h-5 text-red-600" />
-                ) : (
-                  <CheckCircle2 className="w-5 h-5 text-green-600" />
-                )}
-                <p className="text-sm font-semibold">
-                  {preview.already_redeemed
-                    ? "Already Redeemed"
-                    : "Valid — Not Redeemed"}
-                </p>
-              </div>
-
-              {/* 🟢 Tampilkan waktu redeemed kalau sudah pernah redeem */}
-              {preview.already_redeemed && preview.redeemed_at && (
-                <p className="text-xs text-gray-600 pl-7 mt-1">
-                  Redeemed at:{" "}
-                  {moment(preview.redeemed_at).format("HH:mm:ss, DD MMM")}
-                </p>
-              )}
-
-              {!preview.already_redeemed && (
-                <Button className="mt-3" onClick={handleRedeem}>
-                  Confirm Redeem
-                </Button>
-              )}
+                  <div className="grid grid-cols-4 text-xs mt-2 text-center">
+                    <div>
+                      <p className="font-bold">{item.planned_qty}</p>
+                      <p className="text-gray-500 text-[11px]">Planned</p>
+                    </div>
+                    <div>
+                      <p className="font-bold">{item.auto_random_qty}</p>
+                      <p className="text-gray-500 text-[11px]">Random</p>
+                    </div>
+                    <div>
+                      <p className="font-bold">{item.spare_qty}</p>
+                      <p className="text-gray-500 text-[11px]">Spare</p>
+                    </div>
+                    <div>
+                      <p className="font-bold">{item.redeemed_qty}</p>
+                      <p className="text-gray-500 text-[11px]">Redeemed</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </Card>
 
-        {/* RIGHT PANEL */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr,1fr] gap-6">
-          {/* PREVIEW DETAILS */}
-          <Card className="p-5">
-            <h2 className="text-lg font-semibold mb-3">Preview Details</h2>
+        {/* ============================
+            GRID: SCANNER (LEFT) + PREVIEW (RIGHT)
+        ============================ */}
+        <div className="grid grid-cols-1 md:grid-cols-[1fr,1fr] gap-6">
+          {/* SCANNER LEFT */}
+          <Card className="p-5 space-y-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <QrCode className="w-5 h-5" /> QR Scanner
+            </h2>
 
-            {!preview ? (
-              <p className="text-sm text-gray-500">No preview...</p>
+            {!cameraAvailable ? (
+              <p className="text-red-500">No camera available</p>
             ) : (
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-3">
-                  <User className="w-5 h-5 text-gray-600" />
-                  <div>
-                    <p className="font-semibold">{preview.user_name}</p>
-                    <p className="text-xs text-gray-500">
-                      Department: {preview.department_id || "-"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Utensils className="w-5 h-5 text-gray-600" />
-                  <div>
-                    <p className="font-semibold">{preview.menu_name}</p>
-                    <p className="text-xs text-gray-500">
-                      Tray: {preview.tray_name}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-gray-600" />
-                  <div>
-                    <p className="font-semibold">Shift {preview.shift_name}</p>
-                    <p className="text-xs text-gray-500">
-                      {preview.shift_time}
-                    </p>
-                  </div>
-                </div>
-
-                <Badge
-                  className={
-                    preview.already_redeemed
-                      ? "bg-red-100 text-red-800"
-                      : "bg-blue-100 text-blue-800"
-                  }
-                >
-                  {preview.already_redeemed
-                    ? "Already Redeemed"
-                    : "Not Redeemed"}
-                </Badge>
-
-                {/* 🟢 Tampilkan redeemed_at juga di detail */}
-                {preview.redeemed_at && (
-                  <p className="text-xs text-gray-600 mt-1">
-                    Redeemed at:{" "}
-                    {moment(preview.redeemed_at).format("HH:mm:ss, DD MMM")}
-                  </p>
-                )}
+              <div
+                className={`rounded-lg overflow-hidden border ${
+                  highlight ? "border-green-500 shadow-lg" : "border-gray-300"
+                }`}
+              >
+                <div id="qr-reader" ref={scannerRef} />
               </div>
             )}
+
+            <div className="space-y-2">
+              <p className="text-xs text-gray-500">Manual Input</p>
+              <div className="flex gap-2">
+                <Input
+                  value={qrInput}
+                  onChange={(e) => setQrInput(e.target.value)}
+                  placeholder="Enter QR code..."
+                />
+                <Button onClick={() => handlePreview(sanitizeQr(qrInput))}>
+                  Preview
+                </Button>
+              </div>
+            </div>
           </Card>
 
-          {/* LAST REDEEM DETAILS + TODAY STOCK */}
-          <div className="space-y-4">
-            {/* LAST REDEEM DETAILS */}
-            <Card className="p-5">
-              <h2 className="text-lg font-semibold mb-3">Last Redeem</h2>
+          {/* PREVIEW RIGHT */}
+          {preview && (
+            <Card
+              className={`p-5 border-2 ${
+                preview.already_redeemed
+                  ? "border-red-400 bg-red-50"
+                  : "border-green-400 bg-green-50"
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                {preview.already_redeemed ? (
+                  <XCircle className="w-6 h-6 text-red-600" />
+                ) : (
+                  <CheckCircle2 className="w-6 h-6 text-green-600" />
+                )}
 
-              {!redeemResult ? (
-                <p className="text-sm text-gray-500">
-                  Belum ada redeem di sesi ini...
+                {!preview.already_redeemed && (
+                  <p className="text-xs text-gray-500 mb-2">
+                    Auto confirming in 2 seconds…
+                  </p>
+                )}
+                <p className="text-lg font-semibold">
+                  {preview.already_redeemed
+                    ? "ALREADY REDEEMED"
+                    : "READY TO REDEEM"}
                 </p>
-              ) : (
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Employee</span>
-                    <span className="font-semibold">
-                      {redeemResult.user}
-                    </span>
-                  </div>
+              </div>
 
-                  <div className="flex justify-between">
-                    <span>Menu</span>
-                    <span className="font-semibold">
-                      {redeemResult.menu}
-                    </span>
-                  </div>
+              <p className="text-2xl font-bold mb-1">{preview.user_name}</p>
 
-                  <div className="flex justify-between">
-                    <span>Tray</span>
-                    <span className="font-semibold">
-                      {redeemResult.tray}
-                    </span>
-                  </div>
+              <p className="text-lg font-semibold text-gray-700 mb-3">
+                Shift {preview.shift_name} — {preview.menu_name}
+              </p>
 
-                  <div className="flex justify-between">
-                    <span>Shift</span>
-                    <span className="font-semibold">
-                      {redeemResult.shift}
-                    </span>
-                  </div>
+              <div className="p-3 rounded-lg bg-white border shadow-sm mb-4">
+                <p className="text-sm text-gray-500">Ambil di tray:</p>
+                <p className="text-xl font-semibold">{preview.tray_name}</p>
 
-                  <div className="flex justify-between">
-                    <span>Date</span>
-                    <span className="font-semibold">
-                      {moment(redeemResult.service_date).format(
-                        "dddd, DD MMM YYYY"
-                      )}
-                    </span>
-                  </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Waktu shift: {preview.shift_time}
+                </p>
+              </div>
 
-                  <div className="flex justify-between">
-                    <span>Redeemed At</span>
-                    <span className="font-semibold">
-                      {moment(redeemResult.redeemed_at).format(
-                        "HH:mm:ss, DD MMM"
-                      )}
-                    </span>
-                  </div>
+              {preview.already_redeemed && preview.redeemed_at && (
+                <p className="text-xs text-gray-600 mb-3">
+                  Redeemed at:{" "}
+                  <b>
+                    {moment(preview.redeemed_at).format("HH:mm:ss, DD MMM")}
+                  </b>
+                </p>
+              )}
 
-                  <div className="flex justify-between pt-2">
-                    <span>Remaining</span>
-                    <Badge
-                      className={
-                        redeemResult.remaining <= 0
-                          ? "bg-red-100 text-red-800"
-                          : "bg-green-100 text-green-800"
-                      }
-                    >
-                      {redeemResult.remaining}
-                    </Badge>
-                  </div>
-                </div>
+              {!preview.already_redeemed && (
+                <Button className="w-full py-3 text-lg" onClick={handleRedeem}>
+                  Confirm Redeem
+                </Button>
               )}
             </Card>
-
-          
-          </div>
+          )}
         </div>
+
+        {/* ============================
+            LAST REDEEM — BOTTOM
+        ============================ */}
+       
+<Card className="p-5">
+  <h2 className="text-lg font-semibold mb-3">Last Redeem (Live)</h2>
+
+  {todayLogs.length === 0 ? (
+    <p className="text-sm text-gray-500">No redeem today...</p>
+  ) : (
+    <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+
+      {todayLogs.map((log, i) => (
+        <div
+          key={i}
+          className={`
+            p-3 border rounded-lg bg-white shadow-sm
+            ${log.type === "spare" ? "border-purple-300 bg-purple-50" : ""}
+          `}
+        >
+          <div className="flex justify-between items-center">
+            <p className="font-bold text-md">{log.user?.name}</p>
+
+            <Badge
+              className={
+                log.type === "spare"
+                  ? "bg-purple-600 text-white"
+                  : "bg-blue-600 text-white"
+              }
+            >
+              {log.type.toUpperCase()}
+            </Badge>
+          </div>
+
+          <p className="text-sm text-gray-700 mt-1">
+            {log.menu?.nama_menu} — Tray {log.menu?.tray?.name}
+          </p>
+
+          <p className="text-xs text-gray-500">
+            Shift: {log.shift?.name || "-"}
+          </p>
+
+          <p className="text-xs mt-1">
+            Redeemed:{" "}
+            <b>{moment(log.created_at).format("HH:mm:ss, DD MMM")}</b>
+          </p>
+        </div>
+      ))}
+
+    </div>
+  )}
+</Card>
       </div>
     </div>
   );
